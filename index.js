@@ -1,8 +1,9 @@
 const _ = require('lodash');
+var logger;
 
 class RequestLogger {
   static buildConfig() {
-    return _.defaultsDeep(exports.config, {
+    return _.defaults(exports.config, {
       // log4js channel
       logger: '[http-snitch]',
       // error levels for logging (if absent, will ignore the request)
@@ -26,18 +27,20 @@ class RequestLogger {
   }
 
   constructor() {
+    this.regex = /%(\w+)/g;
+
     this.config = RequestLogger.buildConfig();
 
     this.logger = require('log4js').getLogger(this.config.logger);
     this.templates = {
-      failure: _.map(this.config.format.failure, this.compile),
-      success: _.map(this.config.format.success, this.compile)
+      failure: _.map(this.config.format.failure, (format) => this.compile(format)),
+      success: _.map(this.config.format.success, (format) => this.compile(format))
     };
   }
 
   compile(template) {
     return _.template(template, {
-      interpolate: /%(\w+)/g
+      interpolate: this.regex
     });
   }
 
@@ -52,6 +55,10 @@ class RequestLogger {
     });
   }
 
+  isLogged(type) {
+    return !!this.config.level[type];
+  }
+
   log(level, messages, log) {
     _.each(messages, (message) => {
       this.logger[level](this.format(message, log));
@@ -59,53 +66,106 @@ class RequestLogger {
   }
 
   logFailure(log) {
-    if (this.config.level.failure) {
+    if (this.isLogged('failure')) {
       this.log(this.config.level.failure, this.templates.failure, log);
     }
   }
 
   logSuccess(log) {
-    if (this.config.level.success) {
+    if (this.isLogged('success')) {
       this.log(this.config.level.success, this.templates.success, log);
     }
+  }
+
+  options() {
+    return {
+      trackSuccessfulRequests: this.isLogged('success'),
+      trackFailingRequests: this.isLogged('failure')
+    };
   }
 }
 
 exports.setup = function () {
+  logger = new RequestLogger();
 };
 
 exports.onPageLoad = function () {
-  browser.addMockModule('protractor.http.snitch', function () {
+  browser.addMockModule('protractor.http.snitch', function (options) {
     angular.module('protractor.http.snitch', [])
-      .config(['$provide', '$httpProvider', function ($provide, $httpProvider) {
+      .config(['$httpProvider', function ($httpProvider) {
         var snitch = window['protractor.http.snitch'] = {
           success: [],
           failure: []
         };
-
         $httpProvider.interceptors.push(['$q', function ($q) {
-          return {
-            response: function (response) {
-              snitch.success.push(response);
-              return response;
-            },
-            responseError: function (error) {
-              snitch.failure.push(error);
-              return $q.reject(error);
+          var interceptor = {};
+
+          /**
+           * The main purpose of this function is to limit the size of communications between Selenium and Node.
+           * It will only
+           */
+          function safeStringify(object) {
+            var output = {};
+
+            function safeValue(value) {
+              switch (typeof value) {
+                case 'object':
+                  return '[...]';
+                case 'string':
+                  if (value.length > 195) {
+                    return value.substr(0, 195) + '[...]'
+                  } else {
+                    return value;
+                  }
+                default:
+                  return value;
+              }
             }
-          };
+
+            for (var key in object) {
+              output[key] = safeValue(object[key]);
+            }
+            return output;
+          }
+
+          function simplifiedResponse(response) {
+            return {
+              data: safeStringify(response.data),
+              config: {
+                data: safeStringify(response.config.data),
+                method: response.config.method,
+                url: response.config.url
+              },
+              status: response.status,
+              statusText: response.statusText
+            };
+          }
+
+          if (options.trackSuccessfulRequests) {
+            interceptor.response = function (response) {
+              snitch.success.push(simplifiedResponse(response));
+              return response;
+            };
+          }
+
+          if (options.trackFailingRequests) {
+            interceptor.responseError = function (error) {
+              snitch.failure.push(simplifiedResponse(error));
+              return $q.reject(error);
+            };
+          }
+          return interceptor;
         }]);
       }]);
-  });
+  }, logger.options());
 };
 
 exports.postTest = function () {
-  var logger = new RequestLogger();
   return browser.executeAsyncScript(function (callback) {
     callback(window['protractor.http.snitch']);
   }).then((logs) => {
-    _.each(logs.success, _.bind(logger.logSuccess, logger));
-    _.each(logs.failure, _.bind(logger.logFailure, logger));
+    _.each(logs.success, (log) => logger.logSuccess(log));
+    _.each(logs.failure, (log) => logger.logFailure(log));
   });
 };
 

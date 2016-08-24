@@ -18,6 +18,6 @@ module.exports = [{
   },
   response: {
     status: 500,
-    data: {some: 'error'}
+    data: {some: 'error', deeper: {some: 'data'}}
   }
 }];

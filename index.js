@@ -162,7 +162,7 @@ exports.onPageLoad = function () {
 
 exports.postTest = function () {
   return browser.executeAsyncScript(function (callback) {
-    callback(window['protractor.http.snitch']);
+    callback(window['protractor.http.snitch'].splice(0));
   }).then((logs) => {
     _.each(logs.success, (log) => logger.logSuccess(log));
     _.each(logs.failure, (log) => logger.logFailure(log));

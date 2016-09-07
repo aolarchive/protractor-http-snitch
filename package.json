@@ -1,6 +1,6 @@
 {
   "name": "protractor-http-snitch",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "HTTP requests sometimes fail. Protractor won't talk, let's hire a snitch.",
   "main": "index.js",
   "scripts": {

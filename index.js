@@ -168,7 +168,7 @@ exports.postTest = function () {
       failure: logs.failure.splice(0)
     });
   }).then((logs) => {
-    if(!log) {
+    if(!logs) {
       this.logger.failure("Logs not available.");
       return;
     }

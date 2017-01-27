@@ -168,6 +168,10 @@ exports.postTest = function () {
       failure: logs.failure.splice(0)
     });
   }).then((logs) => {
+    if(!logs) {
+      this.logger.failure("Logs not available.");
+      return;
+    }
     _.each(logs.success, (log) => logger.logSuccess(log));
     _.each(logs.failure, (log) => logger.logFailure(log));
   });

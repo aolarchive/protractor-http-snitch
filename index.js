@@ -169,7 +169,7 @@ exports.postTest = function () {
     });
   }).then((logs) => {
     if(!log) {
-      this.logger.failure("Logs not avaliable.");
+      this.logger.failure("Logs not available.");
       return;
     }
     _.each(logs.success, (log) => logger.logSuccess(log));

@@ -168,6 +168,10 @@ exports.postTest = function () {
       failure: logs.failure.splice(0)
     });
   }).then((logs) => {
+    if(!log) {
+      this.logger.failure("Logs not avaliable.");
+      return;
+    }
     _.each(logs.success, (log) => logger.logSuccess(log));
     _.each(logs.failure, (log) => logger.logFailure(log));
   });

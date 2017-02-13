@@ -163,6 +163,13 @@ exports.onPageLoad = function () {
 exports.postTest = function () {
   return browser.executeAsyncScript(function (callback) {
     var logs = window['protractor.http.snitch'];
+    if (!logs) {
+      callback({
+        success: [],
+        failure: []      
+      });
+      return;
+    }
     callback({
       success: logs.success.splice(0),
       failure: logs.failure.splice(0)
